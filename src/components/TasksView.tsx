@@ -851,6 +851,7 @@ export default function TasksView({
 
                       <div className="min-w-0">
                         <span
+                          title={task.title}
                           className={`text-xs md:text-sm font-semibold block text-slate-100 truncate leading-relaxed ${
                             task.completed ? "line-through text-slate-500" : ""
                           }`}

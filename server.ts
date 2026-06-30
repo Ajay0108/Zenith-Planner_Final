@@ -672,15 +672,15 @@ function generateFallbackTasks(input: string, persona?: string) {
   const lowercase = input.toLowerCase();
   const tasks: any[] = [];
   
-  // Smart split of continuous text with natural language connectors, including Hinglish/Hindi
+  // Smart split of continuous text with natural language connectors, including Hinglish/Hindi and full stops
   let lines: string[] = [];
   if (!input.includes("\n") && !input.includes(",") && !input.includes(";")) {
     lines = input
-      .split(/\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+|\s+and\s+|\s+aur\s+|\s+phir\s+|\s+fir\s+|\s+uske\s+baad\s+|\s+iske\s+baad\s+|\s+saath\s+hi\s+/i)
+      .split(/\.\s+|\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+|\s+and\s+|\s+aur\s+|\s+phir\s+|\s+fir\s+|\s+uske\s+baad\s+|\s+iske\s+baad\s+|\s+saath\s+hi\s+/i)
       .map(l => l.trim())
       .filter(l => l.length > 2);
   } else {
-    lines = input.split(/[\n,;•]+/).map(l => l.trim()).filter(l => l.length > 2);
+    lines = input.split(/[\n,;•.]+/).map(l => l.trim()).filter(l => l.length > 2);
   }
   
   const pLower = (persona || "").toLowerCase();

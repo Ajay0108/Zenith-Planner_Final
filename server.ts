@@ -143,6 +143,7 @@ ${personaRules}
    - Intelligently space them out across the day (e.g. "08:00 AM", "01:00 PM", "08:00 PM").
    - Avoid their existing calendar conflicts when spacing them out.
 6. Provide an autonomous scheduling recommendation for each identified task, placing it in a logical, smart gap in their schedule.
+7. OPEN-ENDED RESEARCH QUESTIONS: If the user asks an open-ended "how to", "how should I approach this", or research question, you MUST include this exact suggestion at the end of your conversational 'reply' field: "If you want to deep dive or research this further, click the Gemini Sparkles icon on the left to chat directly with Gemini!"
 
 Assign points based on category:
 - "Urgent & Important" -> 40

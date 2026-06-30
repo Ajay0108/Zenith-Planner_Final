@@ -388,7 +388,9 @@ export default function Header({
           className="hidden"
         />
         <div className="w-full h-10 bg-gradient-to-r from-[#1E202B] to-[#141620] border border-blue-500/20 focus-within:border-blue-500/40 focus-within:ring-2 focus-within:ring-blue-500/10 rounded-full flex items-center px-4 gap-2 transition-all">
-          <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+          <a href="https://gemini.google.com/" target="_blank" rel="noopener noreferrer" title="Deep dive with Gemini AI" className="cursor-pointer hover:scale-110 transition-transform shrink-0">
+            <Sparkles className="w-4 h-4 text-blue-400" />
+          </a>
           <input
             type="text"
             placeholder="Ask Gemini Assistant... e.g. 'Summarize my tasks for today'"

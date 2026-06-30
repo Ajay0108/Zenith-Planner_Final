@@ -41,6 +41,7 @@ export default function Header({
   const [isListening, setIsListening] = useState(false);
   const [pseudoInput, setPseudoInput] = useState(userStats?.name || "");
   const [customPersonaInput, setCustomPersonaInput] = useState(userStats?.customPersona || "");
+  const [lastUploadedFile, setLastUploadedFile] = useState<{name: string, size: number} | null>(null);
 
   React.useEffect(() => {
     if (userStats?.name) {
@@ -107,6 +108,16 @@ export default function Header({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check for duplicate file upload
+    if (lastUploadedFile && lastUploadedFile.name === file.name && lastUploadedFile.size === file.size) {
+      const confirmDuplicate = window.confirm(`You just uploaded "${file.name}" a moment ago! Are you sure you want to process this exact same file again? AI will treat it as a new request.`);
+      if (!confirmDuplicate) {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+    }
+    setLastUploadedFile({ name: file.name, size: file.size });
+
     const fileType = file.type || "";
     const isPDF = fileType === "application/pdf" || file.name.endsWith(".pdf");
 
@@ -145,6 +156,11 @@ export default function Header({
         }
       };
       reader.readAsText(file);
+    }
+    
+    // Clear input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 

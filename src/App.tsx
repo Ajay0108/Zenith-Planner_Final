@@ -624,6 +624,20 @@ export default function App() {
     points: number,
     skipAutoCategorize: boolean = false
   ) => {
+    // Check for 50 active tasks limit
+    const activeTasksCount = tasks.filter(t => !t.completed && !t.deleted).length;
+    if (activeTasksCount >= 50) {
+      alert("Task Limit Reached! You can only have up to 50 active tasks. Please complete or delete some tasks before adding more.");
+      return;
+    }
+
+    // Check for duplicate tasks (case-insensitive title match among active tasks)
+    const isDuplicate = tasks.some(t => !t.completed && !t.deleted && t.title.toLowerCase().trim() === title.toLowerCase().trim());
+    if (isDuplicate) {
+      alert(`Duplicate Task Detected: "${title}" is already in your active task list!`);
+      return;
+    }
+
     let finalCategory = category;
     let finalPriority = priority;
     let finalPoints = points;
@@ -663,6 +677,25 @@ export default function App() {
     if (user && !user.isLocalGuest) {
       try {
         await setDoc(doc(db, "users", user.uid, "tasks", newTask.id), newTask);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
+
+  const handleUpdateTask = async (id: string, updates: Partial<Task>) => {
+    const updatedTasks = tasks.map(t => {
+      if (t.id === id) {
+        return { ...t, ...updates };
+      }
+      return t;
+    });
+    setTasks(updatedTasks);
+    localStorage.setItem("tasks_list", JSON.stringify(updatedTasks));
+
+    if (user && !user.isLocalGuest) {
+      try {
+        await setDoc(doc(db, "users", user.uid, "tasks", id), { ...updates }, { merge: true });
       } catch (e) {
         console.error(e);
       }
@@ -939,7 +972,7 @@ export default function App() {
         imagePayload
       );
  
-      if (data.success && data.reply) {
+      if (data.reply) {
         setGeminiReply(data.reply);
         
         // Automatically schedule and add any tasks parsed/returned by Gemini
@@ -1604,6 +1637,7 @@ export default function App() {
             <TasksView
               tasks={getSearchedTasks()}
               onAddTask={handleAddTask}
+              onUpdateTask={handleUpdateTask}
               onCompleteTask={handleCompleteTask}
               onDeleteTask={handleDeleteTask}
               selectedListFilter={selectedListFilter}

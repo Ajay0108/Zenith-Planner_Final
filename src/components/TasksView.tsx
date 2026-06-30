@@ -6,8 +6,9 @@ import { Task, TaskCategory, UserStats } from "../types";
 
 interface TasksViewProps {
   tasks: Task[];
-  onAddTask: (title: string, category: TaskCategory, priority: "High" | "Medium" | "Low", suggestedTimeline: string, notes: string, points: number) => Promise<void>;
+  onAddTask: (title: string, category: TaskCategory, priority: "High" | "Medium" | "Low", suggestedTimeline: string, notes: string, points: number, skipAutoCategorize?: boolean) => Promise<void>;
   onCompleteTask: (id: string, completed: boolean) => Promise<void>;
+  onUpdateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   onDeleteTask: (id: string) => Promise<void>;
   selectedListFilter: string | null;
   showDeleted: boolean;
@@ -20,6 +21,7 @@ interface TasksViewProps {
 export default function TasksView({
   tasks,
   onAddTask,
+  onUpdateTask,
   onCompleteTask,
   onDeleteTask,
   selectedListFilter,
@@ -85,6 +87,9 @@ export default function TasksView({
   const [dragStart, setDragStart] = useState<{ [key: string]: number }>({});
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   const [showCompletedSection, setShowCompletedSection] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editCategory, setEditCategory] = useState<TaskCategory>("Personal Notes");
+  const [editPriority, setEditPriority] = useState<"High" | "Medium" | "Low">("Medium");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isListening, setIsListening] = useState(false);
@@ -389,7 +394,8 @@ export default function TasksView({
       manualPriority,
       manualTimeline,
       manualNotes || "Manually logged task.",
-      pts
+      pts,
+      true
     );
 
     // Reset Form
@@ -852,6 +858,58 @@ export default function TasksView({
                           {task.title}
                         </span>
                         
+                        {editingTaskId === task.id ? (
+                          <div className="flex flex-col gap-2 mt-2">
+                            <div className="flex gap-2">
+                              <select 
+                                value={editCategory} 
+                                onChange={(e) => setEditCategory(e.target.value as TaskCategory)}
+                                className="text-[10px] bg-slate-800 border border-white/20 text-white rounded p-1 outline-none"
+                              >
+                                <option value="Urgent & Important">Urgent & Important</option>
+                                <option value="Important Not Urgent">Important Not Urgent</option>
+                                <option value="Urgent Not Important">Urgent Not Important</option>
+                                <option value="Not Urgent / Important">Not Urgent / Important</option>
+                                <option value="Ikigai">Ikigai</option>
+                                <option value="Personal Notes">Personal Notes</option>
+                              </select>
+                              <select 
+                                value={editPriority} 
+                                onChange={(e) => setEditPriority(e.target.value as "High" | "Medium" | "Low")}
+                                className="text-[10px] bg-slate-800 border border-white/20 text-white rounded p-1 outline-none"
+                              >
+                                <option value="High">High</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Low">Low</option>
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={async () => {
+                                  let pts = task.points;
+                                  if (editCategory === "Urgent & Important" || editCategory === "Important Not Urgent") pts = 40;
+                                  else if (editCategory === "Urgent Not Important") pts = 20;
+                                  else if (editCategory === "Not Urgent / Important") pts = 10;
+                                  else if (editCategory === "Ikigai") pts = 75;
+                                  else if (editCategory === "Personal Notes") pts = 5;
+
+                                  await onUpdateTask(task.id, { category: editCategory, priority: editPriority, points: pts });
+                                  setEditingTaskId(null);
+                                  showStatus("Task updated successfully", "success");
+                                }}
+                                className="text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded"
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => setEditingTaskId(null)}
+                                className="text-[10px] bg-slate-600 hover:bg-slate-700 text-white px-2 py-1 rounded"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           <span className={`text-[9px] border px-1.5 py-0.5 rounded-full font-bold ${getCategoryColor(task.category)}`}>
                             {task.category}
@@ -882,7 +940,20 @@ export default function TasksView({
                               ✓ Completed {new Date(task.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </span>
                           )}
+                          {!task.completed && !task.deleted && (
+                            <button
+                              onClick={() => {
+                                setEditCategory(task.category);
+                                setEditPriority(task.priority);
+                                setEditingTaskId(task.id);
+                              }}
+                              className="text-[9px] text-slate-300 font-bold bg-white/5 hover:bg-white/10 px-1.5 py-0.5 rounded border border-white/10 flex items-center gap-1 transition"
+                            >
+                              Edit
+                            </button>
+                          )}
                         </div>
+                        )}
                       </div>
                     </div>
 

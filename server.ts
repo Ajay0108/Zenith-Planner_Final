@@ -57,6 +57,10 @@ app.post("/api/gemini/categorize", async (req, res) => {
 Analyze the following unstructured input (which could be a raw brain dump, voice transcription, or a description of a photo listing tasks):
 "${rawInput}"
 
+CRITICAL INSTRUCTIONS FOR MULTIPLE TASKS & REPETITIVE TASKS:
+1. Deeply analyze the input. If the user mentions MULTIPLE distinct tasks (e.g., "urgent meeting at 7 and feed the dog"), you MUST split them and generate a separate JSON task object for EACH one. Never combine distinct tasks into one.
+2. If the user mentions a repetitive task (e.g., "drink water 3 times today" or "take medicine twice"), you MUST generate multiple separate task objects for each occurrence and intelligently space out their 'suggestedTimeline' (e.g., Morning, Afternoon, Evening).
+
 ${BASE_CATEGORY_RULES}
 
 ${personaRules}
@@ -129,15 +133,15 @@ Pattern Stats: ${patternString}
 The user's query / prompt is: "${query}"
 
 You must utilize a Multi-Step Chain of Thought reasoning process before outputting the final JSON:
-1. Parse the user's input and identify any tasks, chores, meetings, or commitments they are describing or listing.
-2. Classify each identified task into one of the four Eisenhower Matrix quadrants (and other app-supported categories).
+1. MULTIPLE TASK PARSING: Deeply analyze the user's input (whether text, voice transcript, or image). If the user mentions MULTIPLE distinct tasks (e.g., "urgent meeting at 7 and feed the dog"), you MUST split them and generate a separate JSON task object for EACH distinct action. Never combine them.
+2. Classify each identified task into one of the four Eisenhower Matrix quadrants (and other app-supported categories) based strictly on the user's persona.
 3. Analyze the user's focus persona rules:
 ${personaRules}
 4. Analyze the user's behavioral patterns, Google Calendar events, and current task list. Specifically, learn from context cues like "morning deep work bias".
-5. REPETITIVE TASK AUTO-SCHEDULING: If the user asks to schedule a repetitive or recurring task (e.g. "feed dog thrice a day" or "drink water every 4 hours") WITHOUT specifying exact times, you must:
-   - Check their Google Calendar events and current tasks to find empty time gaps (e.g. Morning, Noon, Evening).
-   - Generate MULTIPLE separate task objects in your JSON output (one for each occurrence).
-   - Assign a specific time for each occurrence (e.g. "08:00 AM", "01:00 PM", "08:00 PM") avoiding their existing calendar conflicts.
+5. REPETITIVE TASK AUTO-SCHEDULING MAX LEVEL: If the user asks to schedule a repetitive or recurring task (e.g. "feed dog thrice a day" or "drink water every 4 hours" or "stretch twice"), you MUST:
+   - Generate MULTIPLE separate task objects in your JSON output (exactly one for each occurrence requested).
+   - Intelligently space them out across the day (e.g. "08:00 AM", "01:00 PM", "08:00 PM").
+   - Avoid their existing calendar conflicts when spacing them out.
 6. Provide an autonomous scheduling recommendation for each identified task, placing it in a logical, smart gap in their schedule.
 
 Assign points based on category:
@@ -668,11 +672,11 @@ function generateFallbackTasks(input: string, persona?: string) {
   const lowercase = input.toLowerCase();
   const tasks: any[] = [];
   
-  // Smart split of continuous text with natural language connectors
+  // Smart split of continuous text with natural language connectors, including Hinglish/Hindi
   let lines: string[] = [];
   if (!input.includes("\n") && !input.includes(",") && !input.includes(";")) {
     lines = input
-      .split(/\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+/i)
+      .split(/\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+|\s+and\s+|\s+aur\s+|\s+phir\s+|\s+fir\s+|\s+uske\s+baad\s+|\s+iske\s+baad\s+|\s+saath\s+hi\s+/i)
       .map(l => l.trim())
       .filter(l => l.length > 2);
   } else {
@@ -815,8 +819,9 @@ function generateFallbackTasks(input: string, persona?: string) {
         explanation = "Negative consumption or worry (Q4) for Retired persona.";
       }
     }
-    // Generic fallback keyword rules
-    else {
+    
+    // Generic fallback keyword rules if category is still Personal Notes
+    if (category === "Personal Notes") {
       if (lineLower.includes("urgent") || lineLower.includes("asap") || lineLower.includes("immediately") || lineLower.includes("crisis") || lineLower.includes("report") || lineLower.includes("meeting") || lineLower.includes("meet") || lineLower.includes("client")) {
         category = "Urgent & Important";
         priority = "High";

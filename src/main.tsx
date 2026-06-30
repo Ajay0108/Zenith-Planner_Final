@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import {ErrorBoundary} from './components/ErrorBoundary.tsx';
 
 // Gracefully intercept and suppress benign environment-specific console warning noise in the preview sandbox
 if (typeof window !== "undefined") {
@@ -34,6 +35,8 @@ if (typeof window !== "undefined") {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

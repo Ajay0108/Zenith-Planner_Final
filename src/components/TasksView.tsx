@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { Sparkles, Mic, Camera, Check, Info, Trash2, ArrowRight, AlertTriangle, CheckCircle2, ChevronRight, HelpCircle, Calendar, Download } from "lucide-react";
+import { Sparkles, Mic, Camera, Check, Info, Trash2, ArrowRight, AlertTriangle, CheckCircle2, ChevronRight, HelpCircle, Calendar, Download, Upload, MicOff, Send, X, BarChart2 } from "lucide-react";
+import { fetchCategorizedTasks } from "../lib/geminiApi";
 import { jsPDF } from "jspdf";
 import { Task, TaskCategory, UserStats } from "../types";
 
@@ -126,18 +127,12 @@ export default function TasksView({
     showStatus(imagePayload ? "AI is performing OCR scanning and auto-categorizing your photo checklist..." : "AI is parsing, analyzing, and auto-categorizing your inputs...", "info");
 
     try {
-      const response = await fetch("/api/gemini/categorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          rawInput: textToParse,
-          persona: userStats?.persona || "student",
-          customPersona: userStats?.customPersona || "",
-          image: imagePayload ? { inlineData: imagePayload } : undefined
-        }),
-      });
+      const data = await fetchCategorizedTasks(
+        textToParse,
+        userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student"),
+        imagePayload
+      );
 
-      const data = await response.json();
       if (data.success && data.tasks) {
         let addedCount = 0;
         for (const t of data.tasks) {

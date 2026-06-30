@@ -295,7 +295,7 @@ export default function DashboardView({ userStats, tasks, onBack }: DashboardVie
                     <YAxis stroke="rgba(255,255,255,0.2)" fontSize={9} tickLine={false} />
                     <Tooltip
                       contentStyle={{ fontSize: 10, borderRadius: 8, background: "#161616", border: "1px solid rgba(255,255,255,0.08)", color: "#fff" }}
-                      formatter={(val: number, name: string) => [`${val} Mins`, name === "focus" ? "🎯 Focus" : "☕ Leisure"]}
+                      formatter={(val: any, name: any) => [`${val} Mins`, name === "focus" ? "🎯 Focus" : "☕ Leisure"]}
                     />
                     <Legend
                       formatter={(val) => val === "focus" ? "🎯 Focus" : "☕ Leisure"}

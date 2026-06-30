@@ -3,29 +3,10 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import fs from "fs";
+import rateLimit from "express-rate-limit";
+import { getPersonaInstruction, BASE_CATEGORY_RULES, BASE_JSON_SCHEMA } from "./src/lib/personaRules";
 
 dotenv.config({ path: ".env.local" });
-
-// Helper to check and load persistent backend PDF reference
-function getStoredPDFReference(): any | null {
-  try {
-    const filePath = path.join(process.cwd(), "stored_pdf_reference.json");
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, "utf-8");
-      const parsed = JSON.parse(fileContent);
-      return {
-        inlineData: {
-          data: parsed.data,
-          mimeType: parsed.mimeType || "application/pdf"
-        }
-      };
-    }
-  } catch (e) {
-    console.error("Failed to read stored PDF reference:", e);
-  }
-  return null;
-}
 
 // Initialize Gemini safely and lazily to prevent server crash if key is missing
 let aiClient: GoogleGenAI | null = null;
@@ -41,77 +22,20 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-function getPersonaInstruction(persona?: string): string {
-  const defaultInstruction = `Determine the user's focus persona. If none specified, use a general balance where work/personal tasks are classified based on standard urgency.`;
-  if (!persona) return defaultInstruction;
-
-  const pLower = persona.toLowerCase();
-  
-  let matrixRules = "";
-  if (pLower.includes("student") || pLower.includes("learner")) {
-    matrixRules = `
-[Active Persona: Student / Learner]
-- Quadrant I (Urgent & Important): Strict academic deadlines (e.g. tomorrow), cramming for imminent exams, submitting critical assignments, emergency laptop repairs.
-- Quadrant II (Important Not Urgent): Proactive deep learning, studying ahead, career preparation, course review, coding projects, internship applications, portfolio building, thesis writing.
-- Quadrant III (Urgent Not Important): Social pressure, administrative campus chores, replying to non-urgent class group chats.
-- Quadrant IV (Not Urgent / Important): Procrastination, TV bingeing, aimless web surfing, gaming until late, mindless scrolling.
-`;
-  } else if (pLower.includes("business") || pLower.includes("owner") || pLower.includes("entrepreneur")) {
-    matrixRules = `
-[Active Persona: Business Owner / Entrepreneur]
-- Quadrant I (Urgent & Important): Business crises, severe client escalations, deadline day tax filing, payroll system crashes, signing urgent vendor contracts, immediate sales meetings.
-- Quadrant II (Important Not Urgent): Long-term business strategy, financial growth planning, proactive hiring, market trend research, building systems and processes, learning new leadership skills.
-- Quadrant III (Urgent Not Important): Low-value administrative duties, minor customer emails, booking flights, ordering office supplies, non-critical meetings.
-- Quadrant IV (Not Urgent / Important): Time wasters, doom-scrolling professional networks without purpose, meetings without agendas, micromanaging trivial details.
-`;
-  } else if (pLower.includes("analyst") || pLower.includes("tech") || pLower.includes("developer") || pLower.includes("professional")) {
-    matrixRules = `
-[Active Persona: Data Analyst / Tech Professional]
-- Quadrant I (Urgent & Important): Broken production pipelines, failing SQL queries, client-facing system anomalies, critical P0 bugs, urgent ad-hoc data pulls.
-- Quadrant II (Important Not Urgent): Skill acquisition (learning Rust, Python, etc.), building comprehensive dashboards, tuning ML models, studying libraries, system architecture planning, refactoring technical debt.
-- Quadrant III (Urgent Not Important): Routine data queries, basic formatting, minor data cleaning, attending non-technical daily standups, replying to low-priority Slack threads.
-- Quadrant IV (Not Urgent / Important): Endlessly tweaking visual colors on charts, tech drama, distractions during work hours, aimless browsing.
-`;
-  } else if (pLower.includes("retired")) {
-    matrixRules = `
-[Active Persona: Retired Individual]
-- Quadrant I (Urgent & Important): Health emergencies, scheduled doctor's appointments, final utility bill notices, time-sensitive home leak repairs.
-- Quadrant II (Important Not Urgent): Writing memoirs, planning travels, estate planning, learning new lifelong skills, deep community involvement.
-- Quadrant III (Urgent Not Important): Minor home annoyances, dealing with telemarketers, minor errands, trivial appointments.
-- Quadrant IV (Not Urgent / Important): Sensationalist 24/7 news channels, engaging in local gossip, worrying about things out of control.
-`;
-  } else {
-    matrixRules = `
-[Active Custom Persona: ${persona}]
-- Apply the Universal Baseline (always Q2 for long-term health, mental wellness, social connection).
-- For professional/daily tasks, deeply analyze how they fit the responsibilities and values of a ${persona}. Focus Q1 on critical path deadlines/outages, Q2 on strategy/growth/skill building, Q3 on interruptions/minor tasks, and Q4 on distractions.
-`;
-  }
-
-  return `
-You must adapt your classification and reasoning to the user's active persona on a micro-level:
-${matrixRules}
-
-CRITICAL RULE — Ikigai Classification (NEVER override this, highest priority rule):
-The following task types are ALWAYS classified as "Ikigai" (75 points) regardless of persona:
-- Physical wellness: yoga, gym, exercise, running, cycling, swimming, sports, stretching, fitness, workout
-- Mental wellness: meditation, mindfulness, journaling, therapy, breathing exercises, self-care
-- Social & family: family dinner, date night, spending time with kids, calling parents, friends hangout, family time
-- Creative hobbies: music, painting, art, writing for fun, dancing, cooking for pleasure, gardening
-- Personal joy: reading for fun, travel, exploring new places, photography
-- Pet care: feeding pet, feeding dog, feeding cat, walking dog, grooming cat, vet visit for pet, caring for animals
-
-CRITICAL: NEVER classify yoga, gym, meditation, family time, or pet care as "Not Urgent / Important" (Q4).
-CRITICAL: NEVER classify yoga, gym, or meditation as "Urgent & Important" (Q1) unless there is a health crisis.
-These activities are LIFE PURPOSE tasks and always worth 75 points.
-
-Apply these rules strictly to determine the 'category', 'priority', and 'points' of the task.`;
-}
-
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Apply JSON body size limit
+app.use(express.json({ limit: "50mb" }));
+
+// Rate limiting middleware for API routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: "Too many requests, please try again later." }
+});
+
+app.use("/api/", apiLimiter);
 
 // API: Health check
 app.get("/api/health", (req, res) => {
@@ -133,58 +57,11 @@ app.post("/api/gemini/categorize", async (req, res) => {
 Analyze the following unstructured input (which could be a raw brain dump, voice transcription, or a description of a photo listing tasks):
 "${rawInput}"
 
-Categorize each distinct task identified in this input into exactly one of these 6 categories. Use these strict classification rules:
-1. "Urgent & Important" (Matrix #1) - Critical tasks requiring immediate attention: scheduled meetings with clients or colleagues, urgent project deadlines, professional commitments with a specific time, anything that must be done TODAY at a specific time.
-2. "Important Not Urgent" (Matrix #2) - Strategic, long-term personal growth: deep learning, career preparation, studying, reading books, planning, strategy sessions. (NOT gym or exercise - those go to Ikigai!)
-3. "Urgent Not Important" (Matrix #3) - Immediate interruptions or administrative communication: replying to non-priority messages, quick phone calls, minor errands, administrative tasks.
-4. "Not Urgent / Important" (Matrix #4) - Also known as Not Urgent Not Important. Low-value distractions: browsing social media, procrastinating activities.
-5. "Ikigai" (Matrix #5) - LIFE PURPOSE, WELL-BEING & PASSION: yoga, gym, exercise, running, sports, meditation, mindfulness, family time, spending time with pets (feeding dog/cat, walking pet), cooking for pleasure, music, art, dance, creative hobbies. These are ALWAYS Ikigai - never Q2 or Q4!
-6. "Personal Notes" (Matrix #6) - Non-actionable thoughts, brief journals, observations, logs, or quotes.
+${BASE_CATEGORY_RULES}
 
 ${personaRules}
 
-For each task, determine:
-- "title": Clean, concise human-readable title.
-- "category": Must be exactly one of: "Urgent & Important", "Important Not Urgent", "Urgent Not Important", "Not Urgent / Important", "Ikigai", or "Personal Notes".
-- "priority": "High" (for urgent/important), "Medium" (for important not urgent, or urgent not important), or "Low" (for not urgent).
-- "suggestedTimeline": Suggested time or duration (e.g. "Today 2:00 PM", "This evening", "1 hour", "Tomorrow").
-- "explanation": Brief 1-sentence reasoning for this categorization based on the persona rules.
-- "points": Point values assigned based on category rules:
-  - "Urgent & Important" -> 40 points
-  - "Important Not Urgent" -> 40 points
-  - "Urgent Not Important" -> 20 points
-  - "Not Urgent / Important" -> 10 points
-  - "Ikigai" -> 75 points
-  - "Personal Notes" -> 5 points
-
-Respond strictly with a JSON array of objects. Do not wrap the JSON in markdown code blocks or any other text. Follow this schema exactly:
-[
-  {
-    "title": "Task title",
-    "category": "Urgent & Important",
-    "priority": "High",
-    "suggestedTimeline": "09:00 AM - 11:00 AM",
-    "explanation": "Explanation here",
-    "points": 40
-  }
-]`;
-
-    // Save PDF as persistent backend reference if one is uploaded
-    if (image && image.inlineData && image.inlineData.mimeType === "application/pdf") {
-      try {
-        fs.writeFileSync(
-          path.join(process.cwd(), "stored_pdf_reference.json"),
-          JSON.stringify({
-            data: image.inlineData.data,
-            mimeType: "application/pdf",
-            timestamp: new Date().toISOString()
-          })
-        );
-        console.log("Successfully saved uploaded PDF reference to backend.");
-      } catch (err) {
-        console.error("Failed to save PDF reference in backend:", err);
-      }
-    }
+${BASE_JSON_SCHEMA}`;
 
     let contents: any[] = [];
     if (image && image.inlineData && image.inlineData.data) {
@@ -194,12 +71,6 @@ Respond strictly with a JSON array of objects. Do not wrap the JSON in markdown 
           mimeType: image.inlineData.mimeType
         }
       });
-    } else {
-      // Check if there is a previously uploaded PDF reference saved in backend
-      const storedPdf = getStoredPDFReference();
-      if (storedPdf) {
-        contents.push(storedPdf);
-      }
     }
     contents.push(prompt);
 
@@ -217,13 +88,13 @@ Respond strictly with a JSON array of objects. Do not wrap the JSON in markdown 
   } catch (error: any) {
     console.error("Gemini categorization error:", error);
     
-    // Graceful fallback when API key is missing or calls fail, so the user has a flawless experience
+    // Graceful fallback when API key is missing or calls fail
     const fallbackTasks = generateFallbackTasks(rawInput, persona);
-    res.json({
-      success: true,
+    res.status(500).json({
+      success: false,
       isMock: true,
       tasks: fallbackTasks,
-      warning: error.message || "Failed to call Gemini API, used offline fast parser."
+      error: "Failed to call Gemini API, used offline fast parser."
     });
   }
 });
@@ -293,23 +164,6 @@ Provide your response strictly as a JSON object with two fields:
 }
 Do not wrap your output in markdown code blocks. Just output raw JSON.`;
 
-    // Save PDF as persistent backend reference if one is uploaded via chat
-    if (image && image.inlineData && image.inlineData.mimeType === "application/pdf") {
-      try {
-        fs.writeFileSync(
-          path.join(process.cwd(), "stored_pdf_reference.json"),
-          JSON.stringify({
-            data: image.inlineData.data,
-            mimeType: "application/pdf",
-            timestamp: new Date().toISOString()
-          })
-        );
-        console.log("Successfully saved uploaded PDF reference to backend from Chat.");
-      } catch (err) {
-        console.error("Failed to save PDF reference from Chat in backend:", err);
-      }
-    }
-
     let contents: any[] = [];
     if (image && image.inlineData && image.inlineData.data) {
       contents.push({
@@ -318,12 +172,6 @@ Do not wrap your output in markdown code blocks. Just output raw JSON.`;
           mimeType: image.inlineData.mimeType
         }
       });
-    } else {
-      // Check if there is a previously uploaded PDF reference saved in backend
-      const storedPdf = getStoredPDFReference();
-      if (storedPdf) {
-        contents.push(storedPdf);
-      }
     }
     contents.push(prompt);
 
@@ -360,12 +208,12 @@ Do not wrap your output in markdown code blocks. Just output raw JSON.`;
       customReply = getOfflineChatReply(query || "", taskContext || []);
     }
 
-    res.json({
-      success: true,
+    res.status(500).json({
+      success: false,
       isMock: true,
       reply: customReply,
       tasks: fallbackTasks,
-      warning: error.message || "Using offline assistant."
+      error: "Using offline assistant. " + (error.message || "")
     });
   }
 });
@@ -395,46 +243,22 @@ You MUST output your step-by-step reasoning in the JSON structure first:
 ${personaRules}
 
 Then, assign the final output:
-- "category": Must be exactly one of: "Urgent & Important", "Important Not Urgent", "Urgent Not Important", "Not Urgent / Important", "Ikigai", or "Personal Notes".
-  - Quadrant I -> "Urgent & Important"
-  - Quadrant II -> "Important Not Urgent"
-  - Quadrant III -> "Urgent Not Important"
-  - Quadrant IV -> "Not Urgent / Important"
-  - Pure passion/creative projects -> "Ikigai"
-  - Passive thoughts/journals -> "Personal Notes"
-- "priority": Must be exactly "High", "Medium", or "Low" (High for Urgent & Important, Medium for Important Not Urgent, Urgent Not Important, Ikigai, Low for Not Urgent).
-- "points": Point values assigned based on category rules:
-  - "Urgent & Important" -> 40
-  - "Important Not Urgent" -> 40
-  - "Urgent Not Important" -> 20
-  - "Not Urgent / Important" -> 10
-  - "Ikigai" -> 75
-  - "Personal Notes" -> 5
-- "suggestedTimeline": e.g., "09:00 AM", "03:00 PM", "Today", "Tonight", "Weekend".
-- "notes": A brief (1-sentence) explanation including the quadrant rationale matching the focus persona.
-
-Respond strictly with a JSON object. Do not wrap the output in markdown code blocks. Follow this schema exactly:
 {
-  "chainOfThought": {
-    "identifiedAction": "string describing the core action",
-    "urgencyAssessment": "string assessing urgency",
-    "importanceAssessment": "string assessing importance",
-    "eisenhowerQuadrant": "string"
-  },
-  "category": "string",
-  "priority": "High" | "Medium" | "Low",
-  "points": number,
-  "suggestedTimeline": "string",
-  "notes": "string"
+  "reasoning_step_1_core_action": "...",
+  "reasoning_step_2_urgency": "...",
+  "reasoning_step_3_importance": "...",
+  "reasoning_step_4_quadrant_selection": "...",
+  "final_classification": {
+    "category": "...",
+    "priority": "...",
+    "points": 10,
+    "suggestedTimeline": "...",
+    "notes": "..."
+  }
 }
-
 Provide your response strictly as a JSON object matching this schema. Do not wrap your output in markdown code blocks. Just output raw JSON.`;
 
     let contents: any[] = [];
-    const storedPdf = getStoredPDFReference();
-    if (storedPdf) {
-      contents.push(storedPdf);
-    }
     contents.push(prompt);
 
     const response = await ai.models.generateContent({
@@ -764,8 +588,8 @@ app.post("/api/workspace/fetch-gmail-messages", async (req, res) => {
         if (detailRes.ok) {
           const detail = await detailRes.json();
           const headers = detail.payload?.headers || [];
-          const subject = headers.find((h) => h.name === "Subject")?.value || "(No Subject)";
-          const from = headers.find((h) => h.name === "From")?.value || "Unknown Sender";
+          const subject = headers.find((h: any) => h.name === "Subject")?.value || "(No Subject)";
+          const from = headers.find((h: any) => h.name === "From")?.value || "Unknown Sender";
           const snippet = detail.snippet || "";
           const date = new Date().toLocaleDateString();
           
@@ -785,8 +609,8 @@ app.post("/api/workspace/fetch-gmail-messages", async (req, res) => {
     }
     
     res.json({ success: true, messages });
-  } catch (error) {
-    console.error("Fetch Gmail messages error:", error);
+  } catch (error: any) {
+    console.error("Error exchanging OAuth code for tokens:", error.message || error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1097,7 +921,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(Number(PORT), "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

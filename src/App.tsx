@@ -7,6 +7,7 @@ import { auth, db, loginWithGoogle, loginAnonymously, logoutUser, getCachedAcces
 import { Task, TaskCategory, UserStats, HabitDay, CalendarEvent, GmailMessage, RankName } from "./types";
 import { initialCalendarEvents, initialHabits, initialTasksList } from "./data";
 import { clearPomoSession } from "./lib/pomoSession";
+import { fetchCategorizedTasks, fetchGeminiChat, fetchTaskClassification } from "./lib/geminiApi";
 
 // Views components
 import Header from "./components/Header";
@@ -542,16 +543,10 @@ export default function App() {
     notes: string;
   } | null> => {
     try {
-      const response = await fetch("/api/gemini/classify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          title: titleText,
-          persona: userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student"),
-          customPersona: userStats?.customPersona || ""
-        }),
-      });
-      const data = await response.json();
+      const data = await fetchTaskClassification(
+        titleText,
+        userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student")
+      );
       if (data.success) {
         return {
           category: data.category as TaskCategory,
@@ -934,22 +929,16 @@ export default function App() {
     }));
  
     try {
-      const response = await fetch("/api/gemini/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          query: queryText, 
-          taskContext: context,
-          calendarContext: calendarEvents,
-          learningsContext: aiBehavioralLearnings,
-          patternContext: completionsPattern,
-          persona: userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student"),
-          customPersona: userStats?.customPersona || "",
-          image: imagePayload ? { inlineData: imagePayload } : undefined
-        }),
-      });
+      const data = await fetchGeminiChat(
+        queryText,
+        context,
+        calendarEvents,
+        aiBehavioralLearnings,
+        completionsPattern,
+        userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student"),
+        imagePayload
+      );
  
-      const data = await response.json();
       if (data.success && data.reply) {
         setGeminiReply(data.reply);
         
@@ -1183,17 +1172,11 @@ export default function App() {
       const eventDescriptions = calendarEvents.map(e => `Title: ${e.title}\nDescription: ${e.description || 'none'}\nDate: ${e.start}`).join("\n\n");
       const requestText = `Please analyze the following upcoming Google Calendar events and extract them as tasks, prioritizing them according to my persona:\n\n${eventDescriptions}`;
 
-      const response = await fetch("/api/gemini/categorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskInput: requestText,
-          taskContext: tasks,
-          persona: userPersona
-        }),
-      });
+      const data = await fetchCategorizedTasks(
+        requestText, 
+        userStats?.persona === "other" ? (userStats?.customPersona || "other") : (userStats?.persona || "student")
+      );
 
-      const data = await response.json();
       if (data.success && data.tasks) {
         // AI returns an array of tasks
         let addedCount = 0;

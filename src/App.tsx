@@ -670,15 +670,18 @@ export default function App() {
       createdAt: new Date().toISOString(),
     };
 
-    const updatedTasks = [newTask, ...tasks];
-    setTasks(updatedTasks);
-    localStorage.setItem("tasks_list", JSON.stringify(updatedTasks));
+    setTasks(prevTasks => {
+      const updatedTasks = [newTask, ...prevTasks];
+      // Save locally to bypass Firebase delay for immediate UI refresh
+      localStorage.setItem("tasks_list", JSON.stringify(updatedTasks));
+      return updatedTasks;
+    });
 
     if (user && !user.isLocalGuest) {
       try {
         await setDoc(doc(db, "users", user.uid, "tasks", newTask.id), newTask);
       } catch (e) {
-        console.error(e);
+        console.error("Firebase save error:", e);
       }
     }
   };

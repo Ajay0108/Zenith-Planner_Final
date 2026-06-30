@@ -82,6 +82,16 @@ export default function MatrixView({
       priority: "Medium",
       pts: 75,
     },
+    {
+      number: "#6",
+      id: "Personal Notes",
+      title: "Personal Notes",
+      colorClass: "border-blue-200 hover:shadow-blue-50/50",
+      bulletColor: "bg-blue-500",
+      tooltip: "Low priority tasks, general reminders, or offline fallbacks.",
+      priority: "Low",
+      pts: 5,
+    },
   ];
 
   const handleQuickAddSubmit = async (e: React.FormEvent, category: TaskCategory, priority: "High" | "Medium" | "Low", pts: number) => {
@@ -132,6 +142,7 @@ export default function MatrixView({
           if (cat.id === "Urgent Not Important") borderTheme = "border-amber-500/20 hover:border-amber-500/35 hover:shadow-amber-500/5";
           if (cat.id === "Not Urgent / Important") borderTheme = "border-slate-500/20 hover:border-slate-500/35 hover:shadow-slate-500/5";
           if (cat.id === "Ikigai") borderTheme = "border-purple-500/20 hover:border-purple-500/35 hover:shadow-purple-500/5";
+          if (cat.id === "Personal Notes") borderTheme = "border-blue-500/20 hover:border-blue-500/35 hover:shadow-blue-500/5";
 
           return (
             <div
@@ -238,32 +249,32 @@ export default function MatrixView({
             </div>
           );
         })}
+      </div>
 
-        {/* #6 Personal Notes Bento Box Card */}
-        <div className="bg-[#121212] border border-dashed border-white/10 rounded-[24px] p-5 flex flex-col min-h-[260px] relative shadow-2xl">
-          <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-slate-500">#6</span>
-              <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
-                Personal Notes
-              </span>
-            </div>
-            
-            <div className="relative group/tooltip">
-              <Info className="w-3.5 h-3.5 text-slate-500 hover:text-indigo-400 cursor-pointer" />
-              <div className="invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 absolute bottom-6 right-0 w-52 bg-[#161616] border border-white/10 text-slate-300 p-2.5 rounded-lg text-[10px] leading-relaxed shadow-2xl z-50 transition-all">
-                A free-writing space for your quick thoughts, reminders, or ideas for later.
-              </div>
+      {/* Note to Self Box */}
+      <div className="bg-[#121212] border border-dashed border-white/10 rounded-[24px] p-5 flex flex-col min-h-[160px] relative shadow-2xl mt-6">
+        <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-500">📝</span>
+            <span className="text-xs font-extrabold text-slate-300 uppercase tracking-wider">
+              Note to Self
+            </span>
+          </div>
+          
+          <div className="relative group/tooltip">
+            <Info className="w-3.5 h-3.5 text-slate-500 hover:text-indigo-400 cursor-pointer" />
+            <div className="invisible opacity-0 group-hover/tooltip:visible group-hover/tooltip:opacity-100 absolute bottom-6 right-0 w-52 bg-[#161616] border border-white/10 text-slate-300 p-2.5 rounded-lg text-[10px] leading-relaxed shadow-2xl z-50 transition-all">
+              A free-writing space for your quick thoughts, self-reflection, or ideas for later.
             </div>
           </div>
-
-          <textarea
-            value={personalNotes}
-            onChange={(e) => onUpdateNotes(e.target.value)}
-            placeholder="Write down reflections, quick reminders, ideas, or stream of consciousness here..."
-            className="flex-grow w-full bg-transparent resize-none text-xs text-slate-300 leading-relaxed outline-none border-none placeholder-slate-600 focus:placeholder-slate-400"
-          />
         </div>
+
+        <textarea
+          value={personalNotes}
+          onChange={(e) => onUpdateNotes(e.target.value)}
+          placeholder="Write down reflections, quick reminders, ideas, or stream of consciousness here..."
+          className="flex-grow w-full bg-transparent resize-none text-xs text-slate-300 leading-relaxed outline-none border-none placeholder-slate-600 focus:placeholder-slate-400"
+        />
       </div>
     </div>
   );

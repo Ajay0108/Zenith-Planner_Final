@@ -166,16 +166,16 @@ export default function TasksView({
       } else {
         showStatus("Offline fallback activated! Tasks categorized locally using smart syntax matching.", "success");
         
-        // Smart split of continuous text with natural language connectors
+        // Smart split of continuous text with natural language connectors, including Hinglish/Hindi and full stops
         let lines: string[] = [];
-        if (!textToParse.includes("\n") && !textToParse.includes(",") && !textToParse.includes(";")) {
+        if (!textToParse.includes("\n") && !textToParse.includes(";")) {
           // Continuous single-sentence string: Split intelligently by common connectors
           lines = textToParse
-            .split(/\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+/i)
+            .split(/\.\s+|\s+and\s+also\s+|\s+as\s+well\s+as\s+|\s+and\s+need\s+to\s+|\s+i\s+need\s+to\s+|\s+also\s+i\s+need\s+to\s+|\s+then\s+i\s+have\s+to\s+|\s+then\s+|\s+and\s+|\s+aur\s+|\s+phir\s+|\s+fir\s+|\s+uske\s+baad\s+|\s+iske\s+baad\s+|\s+saath\s+hi\s+/i)
             .map(l => l.trim())
             .filter(l => l.length > 2);
         } else {
-          lines = textToParse.split(/[\n,;•]+/).map(l => l.trim()).filter(l => l.length > 2);
+          lines = textToParse.split(/[\n;•.]+/).map(l => l.trim()).filter(l => l.length > 2);
         }
 
         let addedCount = 0;

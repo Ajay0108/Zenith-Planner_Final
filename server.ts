@@ -133,7 +133,7 @@ Pattern Stats: ${patternString}
 The user's query / prompt is: "${query}"
 
 You must utilize a Multi-Step Chain of Thought reasoning process before outputting the final JSON:
-1. MULTIPLE TASK PARSING: Deeply analyze the user's input (whether text, voice transcript, or image). If the user mentions MULTIPLE distinct tasks (e.g., "urgent meeting at 7 and feed the dog"), you MUST split them and generate a separate JSON task object for EACH distinct action. Never combine them.
+1. MULTIPLE TASK PARSING: Deeply analyze the user's input (whether text, voice transcript, or image). If the user mentions MULTIPLE distinct tasks (e.g., "urgent meeting at 7 and feed the dog"), you MUST split them and generate a separate JSON task object for EACH distinct action. Never combine them. Do NOT use exclamation marks (!) as a separator between tasks; they are often just used for excitement or emphasis.
 2. Classify each identified task into one of the four Eisenhower Matrix quadrants (and other app-supported categories) based strictly on the user's persona.
 3. Analyze the user's focus persona rules:
 ${personaRules}
@@ -143,7 +143,8 @@ ${personaRules}
    - Intelligently space them out across the day (e.g. "08:00 AM", "01:00 PM", "08:00 PM").
    - Avoid their existing calendar conflicts when spacing them out.
 6. Provide an autonomous scheduling recommendation for each identified task, placing it in a logical, smart gap in their schedule.
-7. OPEN-ENDED RESEARCH QUESTIONS: If the user asks an open-ended "how to", "how should I approach this", or research question, you MUST include this exact suggestion at the end of your conversational 'reply' field: "If you want to deep dive or research this further, click the Gemini Sparkles icon on the left to chat directly with Gemini!"
+7. OPEN-ENDED RESEARCH QUESTIONS: If the user asks an open-ended "how to", "how should I approach this", or research question, you MUST include this exact suggestion at the end of your conversational 'reply' field: "If you want to deep dive into specific topic I can help you with it"
+8. CONCISE TASK SUMMARIZATION: If the user provides a long, rambling input, brain dump, or story, you MUST summarize it into short, actionable task titles. Strip out emotional fluff, rambling context, and unnecessary details, reducing them strictly to the core action (e.g. "I am so tired and angry that my client yelled at me for the invoice" -> "Send updated invoice to client").
 
 Assign points based on category:
 - "Urgent & Important" -> 40
@@ -211,6 +212,10 @@ Do not wrap your output in markdown code blocks. Just output raw JSON.`;
       customReply = `I have analyzed your request offline and automatically scheduled ${fallbackTasks.length} tasks matching your focus profile: ${titles}. Let's make today highly focused!`;
     } else {
       customReply = getOfflineChatReply(query || "", taskContext || []);
+    }
+
+    if (queryLower.includes("how ") || queryLower.includes("why ") || queryLower.includes("what ") || queryLower.includes("approach") || queryLower.includes("research") || queryLower.includes("help") || queryLower.includes("explain")) {
+      customReply += " If you want to deep dive into specific topic I can help you with it";
     }
 
     res.status(500).json({

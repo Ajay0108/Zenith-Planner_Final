@@ -445,7 +445,28 @@ export default function Header({
           </div>
           <div className="flex-grow">
             <h4 className="text-xs font-bold text-indigo-300 tracking-wide uppercase mb-1">Gemini AI response</h4>
-            <p className="text-xs md:text-sm font-medium leading-relaxed">{geminiReply}</p>
+            <p className="text-xs md:text-sm font-medium leading-relaxed">
+              {geminiReply.replace("If you want to deep dive into specific topic I can help you with it", "").trim()}
+            </p>
+            {geminiReply.includes("If you want to deep dive into specific topic I can help you with it") && (
+              <div className="flex items-center gap-2 mt-3">
+                <a
+                  href="https://gemini.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold px-4 py-1.5 rounded-lg transition-colors cursor-pointer inline-block shadow-md border border-indigo-500/50"
+                  onClick={() => setGeminiReply(null)}
+                >
+                  Proceed to Deep Dive
+                </a>
+                <button
+                  onClick={() => setGeminiReply(null)}
+                  className="bg-white/5 hover:bg-white/10 text-white text-[11px] font-bold px-4 py-1.5 rounded-lg transition-colors cursor-pointer border border-white/10"
+                >
+                  Skip
+                </button>
+              </div>
+            )}
           </div>
           <button
             onClick={() => setGeminiReply(null)}
